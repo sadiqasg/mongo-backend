@@ -1,68 +1,76 @@
-const User = require('../models/user');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
+const { Pool } = require('pg');
 
-exports.signup = (req, res, next) => {
-    bcrypt.hash(req.body.password, 10).then(
-        (hash) => {
-            const user = new User({
-                email: req.body.email,
-                password: hash
-            });
-            user.save().then(
-                () => {
-                    res.status(201).json({
-                        message: 'User added successfully!'
-                    });
-                }
-            ).catch(
-                (error) => {
-                    res.status(500).json({
-                        error: error
-                    });
-                }
-            );
-        }
-    );
+const pool = new Pool({
+  user: 'me',
+  host: 'localhost',
+  database: 'api',
+  password: 'password',
+  port: 5432,
+})
+
+const getUsers = (req, res) => {
+  pool.query('SELECT * FROM users ORDER BY id ASC', (error, results) => {
+    if (error) {
+      throw error
+    }
+    res.status(200).json(results.rows)
+  })
 };
 
-exports.login = (req, res, next) => {
-    User.findOne({ email: req.body.email }).then(
-        (user) => {
-            if (!user) {
-                return res.status(401).json({
-                    error: new Error('User not found!')
+const signUp = (req, res) => {
+    bcrypt.hash(req.body.password, 10, function(err, hash) {
+      const { email } = req.body;
+    
+      pool.query('INSERT INTO users (email, password) VALUES ($1, $2)', [email, hash], (error, results) => {
+        if (error) {
+          res.send(error.detail);
+          return console.log('error', error);
+        }
+        res.status(201).json({msg: 'user created'});
+      })        
+    });
+};
+
+const login = (req, res) => {
+    const { email, password } = req.body;
+
+    pool.query('SELECT * FROM users WHERE (email = $1)', [email], (err, results) => {
+        if (err) {
+            return console.log('error', err);
+        }
+
+        if (results.rows.length > 0) {
+            const { password: hash } = results.rows[0];
+
+            bcrypt.compare(password, hash, function(err, response) {
+              if(response) {
+                const token = jwt.sign({ email, password }, 'RANDOM_TOKEN_SECRET', { expiresIn: '24h' });
+                
+                res.status(200).json({
+                    email: email,
+                    token: token
                 });
-            }
-            bcrypt.compare(req.body.password, user.password).then(
-                (valid) => {
-                    if (!valid) {
-                        return res.status(401).json({
-                            error: new Error('Incorrect password!')
-                        });
-                    }
-                    const token = jwt.sign(
-                        { userId: user._id },
-                        'RANDOM_TOKEN_SECRET',
-                        { expiresIn: '24h' });
-                    res.status(200).json({
-                        userId: user._id,
-                        token: token
-                    });
-                }
-            ).catch(
-                (error) => {
-                    res.status(500).json({
-                        error: error
-                    });
-                }
-            );
-        }
-    ).catch(
-        (error) => {
-            res.status(500).json({
-                error: error
+
+              } else {
+               console.log('Password is incorrect')
+              } 
             });
+        } else {
+            res.json({
+                msg: 'email not found'
+            })
         }
-    );
+
+
+    });
+
+};
+
+
+module.exports = {
+    getUsers,
+    signUp,
+    login
 };

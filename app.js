@@ -1,25 +1,16 @@
 const express = require('express');
 const bodyParser = require('body-parser');
-const mongoose = require('mongoose');
-
 const path = require('path');
 
-const stuffRoutes = require('./routes/stuff');
 const userRoutes = require('./routes/user');
+const courseRoutes = require('./routes/course');
+const orderRoutes = require('./routes/order');
 
 const app = express();
 
-
-mongoose.connect('mongodb+srv://sadiq:KszorR10J4yXQWoa@cluster0-m613z.mongodb.net/test?retryWrites=true&w=majority')
-	.then(() => {
-		console.log('connect successfully to MongoDB Atlas!')
-	})
-	.catch((error) => {
-		console.log('Unable to connect to MongoDB Atlas')
-		console.log('error', error)
-	})
-
-app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({
+  extended: true
+}));
 
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -28,9 +19,17 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use('/api/stuff', stuffRoutes);
 app.use('/api/auth', userRoutes);
+app.use('/api/course', courseRoutes);
+app.use('/api/order', orderRoutes);
 
 app.use('/images', express.static(path.join(__dirname, 'images')));
+
+app.get('/', (req, res) => {
+	res.json({
+		status: 200,
+		message: 'saslearn api'
+	})
+})
 
 module.exports = app;
